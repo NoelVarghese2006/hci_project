@@ -1,7 +1,41 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { birthdayTask } from '../src/tasks/birthday';
-import { consentToSession, createSession, revealTask, submitTask, updateTaskState } from '../src/experiment/session';
+import { consentToSession, createSession, revealTask, submitTask, terminateTask, updateTaskState } from '../src/experiment/session';
+import { loadSession, saveSession } from '../src/experiment/persistence';
+import { authorizeSupervisor, configureSupervisorAccess } from '../src/experiment/supervisor';
+
+test('damaged final outcomes cannot recover or overwrite preserved study records', async () => {
+  const active = revealTask(consentToSession(createSession('B003', 1, 1000), 1500), 2000);
+  const edited = updateTaskState(active, { items: [
+    { id: 'food', optionId: 'wrap-buffet', quantity: 1 },
+    { id: 'drink', optionId: 'water-pack', quantity: 1 },
+    { id: 'activity', optionId: 'trivia', quantity: 1, startMinute: 840 },
+  ] }, { type: 'item_added', payload: {} }, 2000);
+  const completed = submitTask(edited, 3000);
+  const supervised = await configureSupervisorAccess(edited, 'research-only');
+  const authorization = (await authorizeSupervisor(supervised, 'research-only'))!;
+  const terminated = terminateTask(supervised, authorization, 'Protocol interruption.', 4000);
+  const damaged = [
+    { ...completed.trials[0], finalPlan: undefined },
+    { ...completed.trials[0], successfulCompletionMs: undefined },
+    { ...completed.trials[0], elapsedMs: 999 },
+    { ...completed.trials[0], finalValidation: { isComplete: true, errors: 'invalid', warnings: [] } },
+    { ...completed.trials[0], submissionAttempts: [{ timestamp: 'invalid' }] },
+    { ...terminated.trials[0], successfulCompletionMs: 2000 },
+    { ...edited.trials[0], submissionAttempts: {} },
+  ];
+  for (const trial of damaged) {
+    const source = trial.status === 'terminated' ? terminated : trial.status === 'active' ? edited : completed;
+    const session = { ...source, trials: [trial, ...source.trials.slice(1)] };
+    let serialized: string | null = null;
+    const storage = { getItem: () => serialized, setItem: (_key: string, value: string) => { serialized = value; } };
+    saveSession(session as typeof completed, storage, 5000);
+    const original = serialized;
+    expect(() => loadSession(storage)).toThrow(/incompatible or damaged/);
+    expect(serialized).toBe(original);
+  }
+});
 
 test('zero-duration passing submission freezes the plan and subsequent edits or submissions do nothing', () => {
   const active = revealTask(consentToSession(createSession('B002', 1, 1000), 1500), 2000);
