@@ -63,6 +63,7 @@ select { font: inherit; padding: 10px; border: 1px solid #b9c5d5; border-radius:
 .trip-options { display: grid; gap: 16px; margin-bottom: 24px; }
 .travel-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.8rem; }
 .travel-table th, .travel-table td { padding: 8px; border: 1px solid #dfe4ec; text-align: center; }
+.block-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .prototype-note { text-align: center; margin-top: 20px; }
 @media (max-width: 760px) {
   .study-page { padding: 0 16px 24px; }
