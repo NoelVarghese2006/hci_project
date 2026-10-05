@@ -59,6 +59,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid #6e9edc; outline-
 .validation-feedback { margin: 20px 0; padding: 16px; border: 1px solid #dfe4ec; border-radius: 8px; }
 .supervisor-controls { margin-top: 24px; padding-top: 16px; border-top: 1px solid #dfe4ec; }
 textarea { font: inherit; min-height: 80px; border: 1px solid #b9c5d5; border-radius: 6px; padding: 10px; }
+select { font: inherit; padding: 10px; border: 1px solid #b9c5d5; border-radius: 6px; max-width: 100%; }
+.trip-options { display: grid; gap: 16px; margin-bottom: 24px; }
+.travel-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.8rem; }
+.travel-table th, .travel-table td { padding: 8px; border: 1px solid #dfe4ec; text-align: center; }
 .prototype-note { text-align: center; margin-top: 20px; }
 @media (max-width: 760px) {
   .study-page { padding: 0 16px 24px; }
