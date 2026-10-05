@@ -14,6 +14,10 @@ export const FIXED_COMMITMENTS: ScheduleBlock[] = [
   { id: 'work-thu', kind: 'work', day: 3, startMinute: 780, durationMinutes: 240 },
 ];
 export function isFixedCommitment(block: ScheduleBlock) { return FIXED_COMMITMENTS.some((fixed) => fixed.id === block.id); }
+function matchesFixedCommitment(block: ScheduleBlock, fixed: ScheduleBlock) {
+  return block.id === fixed.id && block.kind === fixed.kind && block.day === fixed.day
+    && block.startMinute === fixed.startMinute && block.durationMinutes === fixed.durationMinutes;
+}
 
 function isScheduleShape(value: unknown): value is ScheduleState {
   if (typeof value !== 'object' || value === null || !('blocks' in value) || !Array.isArray(value.blocks)) return false;
@@ -28,8 +32,7 @@ function isScheduleShape(value: unknown): value is ScheduleState {
 }
 
 export function isScheduleState(value: unknown): value is ScheduleState {
-  return isScheduleShape(value) && FIXED_COMMITMENTS.every((fixed) => value.blocks.some((block) => block.id === fixed.id
-    && block.kind === fixed.kind && block.day === fixed.day && block.startMinute === fixed.startMinute && block.durationMinutes === fixed.durationMinutes))
+  return isScheduleShape(value) && FIXED_COMMITMENTS.every((fixed) => value.blocks.some((block) => matchesFixedCommitment(block, fixed)))
     && value.blocks.every((block) => (block.kind !== 'class' && block.kind !== 'work') || isFixedCommitment(block));
 }
 
@@ -46,8 +49,7 @@ function validateSchedule(state: ScheduleState): ValidationResult {
   if (!isScheduleShape(state)) return { isComplete: false, errors: ['Use uniquely identified blocks with valid types and finite times.'], warnings: [] };
   const errors: string[] = [];
   for (const fixed of FIXED_COMMITMENTS) {
-    if (!state.blocks.some((block) => block.id === fixed.id && block.kind === fixed.kind && block.day === fixed.day
-      && block.startMinute === fixed.startMinute && block.durationMinutes === fixed.durationMinutes)) {
+    if (!state.blocks.some((block) => matchesFixedCommitment(block, fixed))) {
       errors.push(`Preserve the fixed ${WEEKDAYS[fixed.day]} ${fixed.kind} commitment.`);
     }
   }
