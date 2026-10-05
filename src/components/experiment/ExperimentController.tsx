@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExperimentSession } from '../../types/experiment';
-import { consentToSession, createSession, recoverSession, revealTask } from '../../experiment/session';
+import { consentToSession, createSession, recoverSession, revealTask, submitTask, terminateTask, updateTaskState } from '../../experiment/session';
 import { PILOT_SCENARIOS } from '../../experiment/scenarios';
 import { loadSession, saveSession } from '../../experiment/persistence';
 import { recordEvent } from '../../experiment/logger';
 import { ExperimentShell } from './ExperimentShell';
+import { BirthdayWorkspace } from '../tasks/birthday';
+import { isBirthdayState } from '../../tasks/birthday';
+import { getTask } from '../../tasks/registry';
+import { ValidationFeedback } from './ValidationFeedback';
+import { configureSupervisorAccess } from '../../experiment/supervisor';
+import { SupervisorControls } from './SupervisorControls';
 
 export function ExperimentController() {
   const [recovery] = useState(() => {
@@ -19,6 +25,8 @@ export function ExperimentController() {
   const [sequenceIndex, setSequenceIndex] = useState('1');
   const [consented, setConsented] = useState(false);
   const [error, setError] = useState(recovery.error);
+  const [supervisorCode, setSupervisorCode] = useState('');
+  const creating = useRef(false);
 
   function commit(next: ExperimentSession) {
     let saved = next;
@@ -52,16 +60,21 @@ export function ExperimentController() {
       <ExperimentShell title="Supervisor setup">
         <h2>Assign a pilot session</h2>
         <p>Enter a pseudonymous ID, without names or contact details. Allocate indices sequentially across supervised sessions.</p>
-        <form onSubmit={(event) => {
+        <form onSubmit={async (event) => {
           event.preventDefault();
+          if (creating.current || sessionRef.current || recovery.error) return;
+          creating.current = true;
           try {
-            commit(createSession(participantId.trim(), Number(sequenceIndex)));
+            commit(await configureSupervisorAccess(createSession(participantId.trim(), Number(sequenceIndex)), supervisorCode));
+            setSupervisorCode('');
           } catch (failure) {
             setError(failure instanceof Error ? failure.message : 'Unable to create session.');
-          }
+          } finally { creating.current = false; }
         }}>
           <label>Participant ID<input required value={participantId} onChange={(event) => setParticipantId(event.target.value)} /></label>
           <label>Sequence index<input type="number" min="1" max="36" required value={sequenceIndex} onChange={(event) => setSequenceIndex(event.target.value)} /></label>
+          <label>Supervisor access code<input type="password" minLength={6} required value={supervisorCode} onChange={(event) => setSupervisorCode(event.target.value)} /></label>
+          <p>Keep this code with the supervisor. It unlocks exceptional termination; participants should not be given the code.</p>
           <p>36 predetermined sequences balance task, condition and position over a full allocation cycle. Smaller pilots may remain unbalanced.</p>
           {error && <p role="alert">{error}</p>}
           <button type="submit" disabled={Boolean(recovery.error)}>Create session</button>
@@ -72,9 +85,11 @@ export function ExperimentController() {
 
   const trial = session.trials[session.currentTrialIndex];
   const scenario = PILOT_SCENARIOS[trial.task];
+  const definition = getTask(trial.task);
   return (
     <ExperimentShell title={session.phase === 'task' ? scenario.title : 'Planning session'}
-      trialIndex={session.phase === 'task' ? session.currentTrialIndex : undefined} startedAt={trial.startedAt} completedAt={trial.completedAt}>
+      trialIndex={trial.startedAt !== undefined ? session.currentTrialIndex : undefined} startedAt={trial.startedAt} completedAt={trial.completedAt}
+      completionControl={session.phase === 'task' && definition ? { onComplete: () => commit(submitTask(sessionRef.current!)) } : session.phase === 'post-task-survey' ? false : undefined}>
       {error && <p role="alert">{error}</p>}
       {session.phase === 'welcome' && <>
         <h2>Welcome to the planning pilot</h2>
@@ -95,10 +110,19 @@ export function ExperimentController() {
       {session.phase === 'task' && <>
         <h2>Scenario and minimum requirements</h2>
         <p>{scenario.instructions}</p>
-        <div className="workspace-placeholder">
+        <ValidationFeedback result={trial.submissionAttempts?.at(-1)?.validation} />
+        {trial.task === 'birthday' && isBirthdayState(trial.taskState) ? <BirthdayWorkspace state={trial.taskState}
+          onChange={(state, action) => commit(updateTaskState(sessionRef.current!, state, action))} /> : <div className="workspace-placeholder">
           <h3>Planning tools are being prepared</h3>
           <p>This task workspace is not implemented yet. A trial cannot pass until its planning tools and validator are available.</p>
-        </div>
+        </div>}
+        {definition && <SupervisorControls session={session} onTerminate={(authorization, reason) => commit(terminateTask(sessionRef.current!, authorization, reason))} />}
+      </>}
+      {session.phase === 'post-task-survey' && <>
+        <h2>{trial.outcome === 'successful' ? 'Task submitted successfully' : 'Trial ended by supervisor'}</h2>
+        <p>Your final plan and outcome have been saved. The post-task survey will appear here when it is implemented.</p>
+        {trial.terminationReason && <p>Termination reason: {trial.terminationReason}</p>}
+        <ValidationFeedback result={trial.finalValidation} />
       </>}
     </ExperimentShell>
   );

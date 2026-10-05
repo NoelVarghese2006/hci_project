@@ -1,6 +1,7 @@
 import type { ExperimentSession } from '../types/experiment';
 import { experimentSequences } from './sequences';
 import { PILOT_CONFIGURATION } from './conditions';
+import { getTask } from '../tasks/registry';
 
 export const SESSION_STORAGE_KEY = 'planning-pilot-session-v1';
 type SessionStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -50,6 +51,8 @@ export function loadSession(storage: SessionStorage = localStorage): ExperimentS
           || trial.outcome !== (trial.status === 'completed' ? 'successful' : 'unsuccessful')))
       || (trial.status === 'terminated' && (typeof trial.terminationReason !== 'string' || !trial.terminationReason.trim()))) return false;
     trialIds.add(trial.id);
+    const definition = getTask(sequence.trials[index].task);
+    if (trial.status !== 'pending' && definition && (trial.taskVersion !== definition.version || !definition.isState(trial.taskState))) return false;
     return true;
   });
   const eventIds = new Set<string>();

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test('unsupported scenario versions block recovery and preserve the original saved data', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P008');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   const original = await page.evaluate(async () => {
     const modulePath = '/src/experiment/persistence.ts';
@@ -36,6 +37,7 @@ test('a failed save keeps the session usable and retains a failure record when s
   });
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P007');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   await expect(page.getByRole('alert')).toContainText('Local saving failed');
   await expect(page.getByRole('heading', { name: 'Welcome to the planning pilot' })).toBeVisible();
@@ -56,6 +58,7 @@ test('committed actions, visibility and recovery retain uniquely ordered records
   await page.clock.pauseAt(new Date('2026-10-04T12:00:01Z'));
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P004');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   await page.getByLabel('I consent to take part in this supervised pilot').check();
   await page.getByRole('button', { name: 'Continue to instructions' }).click();
@@ -96,6 +99,7 @@ test('reload restores consent phase, stable assignment and elapsed task time', a
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P003');
   await page.getByLabel('Sequence index').fill('36');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Welcome to the planning pilot' })).toBeVisible();
@@ -119,16 +123,17 @@ test('scenario reveal starts elapsed time and placeholder tasks cannot complete'
   await page.clock.pauseAt(new Date('2026-10-04T12:00:01Z'));
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P002');
-  await page.getByLabel('Sequence index').fill('7');
+  await page.getByLabel('Sequence index').fill('13');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   await page.getByLabel('I consent to take part in this supervised pilot').check();
   await page.getByRole('button', { name: 'Continue to instructions' }).click();
   await page.clock.runFor(5000);
   await expect(page.getByLabel('Elapsed time')).toHaveText('Elapsed00:00');
   await page.getByRole('button', { name: 'Reveal first task' }).click();
-  await expect(page.getByRole('heading', { name: 'Birthday-party planning', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Weekend-itinerary planning', exact: true })).toBeVisible();
   await expect(page.getByText('Task 1 of 3')).toBeVisible();
-  await expect(page.getByText('12 guests', { exact: false })).toBeVisible();
+  await expect(page.getByText('$500 budget', { exact: false })).toBeVisible();
   await page.clock.runFor(65000);
   await expect(page.getByLabel('Elapsed time')).toHaveText('Elapsed01:05');
   await expect(page.getByRole('button', { name: 'Complete task' })).toBeDisabled();
@@ -140,6 +145,7 @@ test('supervisor assigns a session before consent and shared instructions', asyn
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P001');
   await page.getByLabel('Sequence index').fill('1');
+  await page.getByLabel('Supervisor access code').fill('research-only');
   await page.getByRole('button', { name: 'Create session' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to the planning pilot' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue to instructions' })).toBeDisabled();
