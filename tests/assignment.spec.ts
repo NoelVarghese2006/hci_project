@@ -1,5 +1,22 @@
 import { expect, test } from '@playwright/test';
 import { consentToSession, createSession, revealTask } from '../src/experiment/session';
+import { loadSession, saveSession } from '../src/experiment/persistence';
+
+test('recovery rejects phase or outcome contradictions without replacing timing anchors', () => {
+  const active = revealTask(consentToSession(createSession('P009', 1, 1000), 2000), 3000);
+  const inconsistent = [
+    { ...active, phase: 'instructions' as const },
+    { ...active, trials: active.trials.map((trial, index) => index === 0 ? { ...trial, completedAt: 4000 } : trial) },
+  ];
+  for (const session of inconsistent) {
+    let serialized: string | null = null;
+    const storage = { getItem: () => serialized, setItem: (_key: string, value: string) => { serialized = value; } };
+    saveSession(session, storage, 5000);
+    const original = serialized;
+    expect(() => loadSession(storage)).toThrow(/incompatible or damaged/);
+    expect(serialized).toBe(original);
+  }
+});
 
 test('all 36 supervisor assignments contain every task and condition and balance each position and pairing', () => {
   const positions = Array.from({ length: 3 }, () => ({ tasks: new Map<string, number>(), conditions: new Map<string, number>() }));

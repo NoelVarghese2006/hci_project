@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test';
 
+test('unsupported scenario versions block recovery and preserve the original saved data', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Participant ID').fill('P008');
+  await page.getByRole('button', { name: 'Create session' }).click();
+  const original = await page.evaluate(async () => {
+    const modulePath = '/src/experiment/persistence.ts';
+    const { loadSession, saveSession, SESSION_STORAGE_KEY } = await import(modulePath);
+    const session = loadSession();
+    session.configuration.scenarioVersion = 'unsupported-scenarios-v0';
+    saveSession(session);
+    return { serialized: localStorage.getItem(SESSION_STORAGE_KEY), key: SESSION_STORAGE_KEY };
+  });
+  // Seed the recovered document before React loads; the current tab still owns its in-memory session.
+  await page.addInitScript(({ key, serialized }) => localStorage.setItem(key, serialized!), original);
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Stored data could not be recovered');
+  await expect(page.getByRole('button', { name: 'Create session' })).toBeDisabled();
+  const retained = await page.evaluate(async () => {
+    const modulePath = '/src/experiment/persistence.ts';
+    const { SESSION_STORAGE_KEY } = await import(modulePath);
+    return localStorage.getItem(SESSION_STORAGE_KEY);
+  });
+  expect(retained).toBe(original.serialized);
+});
+
 test('a failed save keeps the session usable and retains a failure record when saving recovers', async ({ page }) => {
   await page.addInitScript(() => {
     const original = Storage.prototype.setItem;

@@ -1,5 +1,6 @@
 import type { ExperimentSession } from '../types/experiment';
 import { experimentSequences } from './sequences';
+import { PILOT_CONFIGURATION } from './conditions';
 
 export const SESSION_STORAGE_KEY = 'planning-pilot-session-v1';
 type SessionStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -28,7 +29,8 @@ export function loadSession(storage: SessionStorage = localStorage): ExperimentS
     || !Array.isArray(value.trials) || value.trials.length !== 3 || !Array.isArray(value.events)
     || !isRecord(value.postTaskSurveys)
     || !isRecord(value.configuration) || !isRecord(value.configuration.conditions)
-    || !['version', 'sequenceVersion', 'scenarioVersion', 'policyVersion'].every((key) => typeof (value.configuration as Record<string, unknown>)[key] === 'string')) {
+    || !(['version', 'sequenceVersion', 'scenarioVersion', 'policyVersion'] as const).every((key) =>
+      (value.configuration as Record<string, unknown>)[key] === PILOT_CONFIGURATION[key])) {
     throw new Error('Stored session is incompatible or damaged. The supervisor must preserve it before starting another session.');
   }
   const sequence = experimentSequences[(value.sequenceIndex as number) - 1];
@@ -40,7 +42,13 @@ export function loadSession(storage: SessionStorage = localStorage): ExperimentS
       || !Number.isInteger(trial.stateRevision) || (trial.stateRevision as number) < 0
       || (trial.startedAt !== undefined && !Number.isFinite(trial.startedAt))
       || (trial.completedAt !== undefined && !Number.isFinite(trial.completedAt))
-      || (trial.status !== 'pending' && trial.startedAt === undefined)) return false;
+      || (trial.status !== 'pending' && trial.startedAt === undefined)
+      || (trial.status === 'pending' && (trial.startedAt !== undefined || trial.completedAt !== undefined || trial.outcome !== undefined))
+      || (trial.status === 'active' && (trial.completedAt !== undefined || trial.outcome !== undefined))
+      || (['completed', 'terminated'].includes(String(trial.status)) &&
+        (trial.completedAt === undefined || (trial.completedAt as number) < (trial.startedAt as number)
+          || trial.outcome !== (trial.status === 'completed' ? 'successful' : 'unsuccessful')))
+      || (trial.status === 'terminated' && (typeof trial.terminationReason !== 'string' || !trial.terminationReason.trim()))) return false;
     trialIds.add(trial.id);
     return true;
   });
@@ -60,7 +68,17 @@ export function loadSession(storage: SessionStorage = localStorage): ExperimentS
       && (policy.threshold === null || (typeof policy.threshold === 'number' && Number.isFinite(policy.threshold)));
   });
   const activeTrial = value.trials[value.currentTrialIndex as number];
+  const currentIndex = value.currentTrialIndex as number;
+  const isEnded = (trial: Record<string, unknown>) => trial.status === 'completed' || trial.status === 'terminated';
+  const phaseValid = value.phase === 'welcome' || value.phase === 'instructions'
+    ? currentIndex === 0 && value.trials.every((trial) => trial.status === 'pending')
+    : value.phase === 'task' || value.phase === 'post-task-survey'
+      ? value.trials.every((trial, index) => index < currentIndex ? isEnded(trial)
+        : index > currentIndex ? trial.status === 'pending'
+          : value.phase === 'task' ? trial.status === 'active' : isEnded(trial))
+      : currentIndex === 2 && value.trials.every(isEnded);
   if (!assignmentsValid || !eventsValid || !configurationValid
+    || !phaseValid
     || (value.phase !== 'welcome' && !Number.isFinite(value.consentedAt))
     || (value.phase === 'task' && activeTrial.status !== 'active')) {
     throw new Error('Stored session is incompatible or damaged. The supervisor must preserve it before starting another session.');
