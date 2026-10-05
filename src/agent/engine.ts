@@ -37,7 +37,7 @@ export function evaluateInterventions(
     else if (context.displays.some((display) => context.now - display.timestamp < cooldowns.globalMs)) exclusionReason = 'global-cooldown';
     else if (context.displays.some((display) => display.signalId === signal.id && context.now - display.timestamp < cooldowns.signalMs)) exclusionReason = 'signal-cooldown';
     else if (policy.threshold === null || finalScore < policy.threshold) exclusionReason = 'below-threshold';
-    return { signalId: signal.id, rawSeverity: signal.severity, recencyBonus: bonus, finalScore,
+    return { signalId: signal.id, signalType: signal.type, rawSeverity: signal.severity, recencyBonus: bonus, finalScore,
       threshold: policy.threshold, proactive: policy.proactive, triggered: false, exclusionReason };
   });
   const eligible = evaluations.filter((evaluation) => evaluation.exclusionReason === null)

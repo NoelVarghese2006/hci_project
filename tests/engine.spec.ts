@@ -31,7 +31,7 @@ test('filters before ranking and uses stable IDs and actual display cooldown bou
   expect(evaluateInterventions(signals, PILOT_CONFIGURATION.conditions.high, { ...context, now: 29_999 }).selected).toBeNull();
   const at30 = evaluateInterventions(signals, PILOT_CONFIGURATION.conditions.high, { ...context, now: 30_000 });
   expect(at30.selected?.signal.id).toBe('a');
-  expect(at30.evaluations.find((entry) => entry.signalId === 'z')?.exclusionReason).toBe('signal-cooldown');
+  expect(at30.evaluations.find((entry) => entry.signalId === 'z')).toMatchObject({ signalType: 'coverage', exclusionReason: 'signal-cooldown' });
   expect(evaluateInterventions([], PILOT_CONFIGURATION.conditions.high, context)).toEqual({ selected: null, evaluations: [] });
 });
 
