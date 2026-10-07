@@ -38,7 +38,16 @@ scenario reveal and includes time in hidden tabs and across reloads.
 Damaged or incompatible saved data is preserved and blocks a replacement
 session. Saving failures show an alert and retain current data in memory; keep
 that tab open for the supervisor. Clearing browser data removes local records.
-This incremental prototype does not yet provide session export or a reset UI.
+For disposable QA sessions (including Issue #19), edit or remove
+`planning-pilot-session-v1` in the browser's Application/Storage panel. Then use
+**Reload saved session** under **Supervisor storage tools**, or on blocked setup,
+to apply the change. Deleting that key returns to setup; editing it revalidates
+the record. Invalid JSON or inconsistent phases block recovery and remain
+preserved. Do not change only the phase to go backwards: start a fresh QA session
+instead. The app checks for external storage changes before saving and on focus,
+including changes from another tab, so its old in-memory copy cannot undo an
+edit or deletion. Reloading discards unsaved in-memory changes, including data
+retained after a save failure. This prototype does not yet provide session export.
 
 Planning workspaces and validators, interventions, surveys and completion are
 reserved for later tickets. The task completion button stays disabled, and the
