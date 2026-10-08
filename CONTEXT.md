@@ -48,6 +48,9 @@ timing, event records and reserved survey fields. The public `createSession`,
 definitions provide versioned initial state, runtime state guards, validators
 and future assistant evaluators. Incompatible or damaged data must be preserved instead
 of silently reassigned. Save failures retain in-memory data and a failure record.
+External storage edits and deletions trigger recovery instead of being overwritten
+by the current tab. Supervisor storage tools allow an explicit reload for QA;
+deleting the saved record and reloading returns to setup.
 
 Scenario, sequence and condition-policy identifiers are versioned pilot drafts.
 Baseline's disabled threshold is serialized explicitly as `null` alongside

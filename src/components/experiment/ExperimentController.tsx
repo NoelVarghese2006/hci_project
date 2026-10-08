@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ExperimentSession } from '../../types/experiment';
 import { consentToSession, createSession, recoverSession, revealTask, submitTask, terminateTask, updateTaskState } from '../../experiment/session';
 import { PILOT_SCENARIOS } from '../../experiment/scenarios';
-import { loadSession, saveSession } from '../../experiment/persistence';
+import { loadSession, saveSession, SESSION_STORAGE_KEY } from '../../experiment/persistence';
 import { recordEvent } from '../../experiment/logger';
 import { ExperimentShell } from './ExperimentShell';
 import { BirthdayWorkspace } from '../tasks/birthday';
@@ -14,11 +14,12 @@ import { SupervisorControls } from './SupervisorControls';
 
 export function ExperimentController() {
   const [recovery] = useState(() => {
-    try { return { session: loadSession(), error: '' }; }
+    try { return { session: loadSession(), serialized: localStorage.getItem(SESSION_STORAGE_KEY), error: '' }; }
     catch { return { session: null, error: 'Stored data could not be recovered. Ask the supervisor to preserve local data before starting another session.' }; }
   });
   const [session, setSession] = useState<ExperimentSession | null>(recovery.session);
   const sessionRef = useRef(session);
+  const lastStoredSession = useRef(recovery.serialized);
   const recovered = useRef(false);
   const lastVisibility = useRef(document.visibilityState);
   const [participantId, setParticipantId] = useState('');
@@ -28,9 +29,25 @@ export function ExperimentController() {
   const [supervisorCode, setSupervisorCode] = useState('');
   const creating = useRef(false);
 
+  function reloadIfStorageChanged() {
+    try {
+      if (lastStoredSession.current !== undefined
+        && localStorage.getItem(SESSION_STORAGE_KEY) !== lastStoredSession.current) {
+        window.location.reload();
+        return true;
+      }
+    } catch { /* Save failures are handled by commit without discarding in-memory data. */ }
+    return false;
+  }
+
   function commit(next: ExperimentSession) {
+    if (reloadIfStorageChanged()) return;
     let saved = next;
-    try { saved = saveSession(next); setError(''); }
+    try {
+      saved = saveSession(next);
+      lastStoredSession.current = JSON.stringify(saved);
+      setError('');
+    }
     catch {
       saved = recordEvent(next, 'persistence_failed', { operation: 'save' });
       setError('Local saving failed. Keep this tab open and inform the supervisor; the current session remains in memory.');
@@ -52,7 +69,11 @@ export function ExperimentController() {
       if (current) commit(recordEvent(current, 'visibility_changed', { visibility }));
     }
     document.addEventListener('visibilitychange', visibilityChanged);
-    return () => document.removeEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('focus', reloadIfStorageChanged);
+    return () => {
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('focus', reloadIfStorageChanged);
+    };
   }, [recovery]);
 
   if (!session) {
@@ -79,6 +100,7 @@ export function ExperimentController() {
           {error && <p role="alert">{error}</p>}
           <button type="submit" disabled={Boolean(recovery.error)}>Create session</button>
         </form>
+        <button type="button" onClick={() => window.location.reload()}>Reload saved session</button>
       </ExperimentShell>
     );
   }
@@ -124,6 +146,11 @@ export function ExperimentController() {
         {trial.terminationReason && <p>Termination reason: {trial.terminationReason}</p>}
         <ValidationFeedback result={trial.finalValidation} />
       </>}
+      <details>
+        <summary>Supervisor storage tools</summary>
+        <p>For disposable QA sessions, edit or remove the saved session in browser storage, then reload it here. Preserve study data first. Reloading discards unsaved in-memory changes.</p>
+        <button type="button" onClick={() => window.location.reload()}>Reload saved session</button>
+      </details>
     </ExperimentShell>
   );
 }
