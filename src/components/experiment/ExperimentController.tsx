@@ -9,6 +9,7 @@ import { BirthdayWorkspace } from '../tasks/birthday';
 import { isBirthdayState } from '../../tasks/birthday';
 import { getTask } from '../../tasks/registry';
 import { ValidationFeedback } from './ValidationFeedback';
+import { ValidationToast } from './ValidationToast';
 import { configureSupervisorAccess } from '../../experiment/supervisor';
 import { SupervisorControls } from './SupervisorControls';
 
@@ -28,6 +29,7 @@ export function ExperimentController() {
   const [error, setError] = useState(recovery.error);
   const [supervisorCode, setSupervisorCode] = useState('');
   const creating = useRef(false);
+  const [validationToast, setValidationToast] = useState<{ attempt: number; errors: string[] } | null>(null);
 
   function reloadIfStorageChanged() {
     try {
@@ -108,10 +110,22 @@ export function ExperimentController() {
   const trial = session.trials[session.currentTrialIndex];
   const scenario = PILOT_SCENARIOS[trial.task];
   const definition = getTask(trial.task);
+
+  function completeTask() {
+    if (reloadIfStorageChanged()) return;
+    const next = submitTask(sessionRef.current!);
+    commit(next);
+    const attempts = next.trials[next.currentTrialIndex].submissionAttempts;
+    const validation = attempts?.at(-1)?.validation;
+    setValidationToast(validation && !validation.isComplete
+      ? { attempt: attempts!.length, errors: validation.errors }
+      : null);
+  }
+
   return (
     <ExperimentShell title={session.phase === 'task' ? scenario.title : 'Planning session'}
       trialIndex={trial.startedAt !== undefined ? session.currentTrialIndex : undefined} startedAt={trial.startedAt} completedAt={trial.completedAt}
-      completionControl={session.phase === 'task' && definition ? { onComplete: () => commit(submitTask(sessionRef.current!)) } : session.phase === 'post-task-survey' ? false : undefined}>
+      completionControl={session.phase === 'task' && definition ? { onComplete: completeTask } : session.phase === 'post-task-survey' ? false : undefined}>
       {error && <p role="alert">{error}</p>}
       {session.phase === 'welcome' && <>
         <h2>Welcome to the planning pilot</h2>
@@ -132,7 +146,9 @@ export function ExperimentController() {
       {session.phase === 'task' && <>
         <h2>Scenario and minimum requirements</h2>
         <p>{scenario.instructions}</p>
-        <ValidationFeedback result={trial.submissionAttempts?.at(-1)?.validation} />
+        <ValidationFeedback result={trial.submissionAttempts?.at(-1)?.validation} announceErrors={false} />
+        {validationToast && <ValidationToast key={validationToast.attempt} errors={validationToast.errors}
+          onDismiss={() => setValidationToast(null)} />}
         {trial.task === 'birthday' && isBirthdayState(trial.taskState) ? <BirthdayWorkspace state={trial.taskState}
           onChange={(state, action) => commit(updateTaskState(sessionRef.current!, state, action))} /> : <div className="workspace-placeholder">
           <h3>Planning tools are being prepared</h3>

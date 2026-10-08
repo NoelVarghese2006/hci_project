@@ -110,12 +110,20 @@ test('failed submission continues timing and a corrected passing submission free
   await expect(page.getByRole('alert')).toContainText('Include at least 12 food servings');
   await expect(page.getByRole('alert')).toContainText('Include at least 12 drink servings');
   await expect(page.getByRole('alert')).toContainText('Include at least one activity');
+  await expect(page.getByRole('alert')).toBeInViewport();
+  await page.getByRole('button', { name: 'Dismiss validation notification' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByText('Requirements to correct')).toBeVisible();
+  await page.getByRole('button', { name: 'Complete task' }).click();
+  await expect(page.getByRole('alert')).toBeInViewport();
+  await expect(page.getByRole('alert')).toContainText('Include at least 12 food servings');
   await page.getByRole('button', { name: 'Add Wrap buffet', exact: true }).click();
   await page.getByRole('button', { name: 'Add Water pack', exact: true }).click();
   await page.getByRole('button', { name: 'Add Trivia', exact: true }).click();
   await page.clock.runFor(40000);
   await page.getByRole('button', { name: 'Complete task' }).dblclick();
   await expect(page.getByRole('heading', { name: 'Task submitted successfully' })).toBeVisible();
+  await expect(page.getByLabel('Task validation notification')).toHaveCount(0);
   await expect(page.getByText('Optional improvements')).toBeVisible();
   await expect(page.getByLabel('Elapsed time')).toHaveText('Elapsed01:00');
   await page.clock.runFor(30000);
@@ -132,11 +140,38 @@ test('failed submission continues timing and a corrected passing submission free
   expect(trial.outcome).toBe('successful');
   expect(trial.elapsedMs).toBe(60000);
   expect(trial.successfulCompletionMs).toBe(60000);
-  expect(trial.submissionAttempts).toHaveLength(2);
+  expect(trial.submissionAttempts).toHaveLength(3);
   expect(trial.submissionAttempts[0].validation.isComplete).toBe(false);
   expect(trial.finalValidation.isComplete).toBe(true);
   expect(trial.finalPlan).toEqual(trial.taskState);
   expect(session.events.filter((event: { eventType: string }) => event.eventType === 'task_completed')).toHaveLength(1);
+});
+
+test('a narrow screen shows coverage and party-window errors in a toast and a corrected plan succeeds', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startBirthday(page);
+  await page.getByRole('button', { name: 'Add Pizza', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Lemonade jug', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Party games', exact: true }).click();
+  const activity = page.getByRole('group', { name: /Party games item/ });
+  await activity.getByLabel('Start time').fill('13:59');
+  await page.getByRole('button', { name: 'Complete task' }).click();
+  const toast = page.getByLabel('Task validation notification');
+  await expect(toast).toBeInViewport({ ratio: 1 });
+  await expect(toast).toContainText('Include at least 12 food servings');
+  await expect(toast).toContainText('Include at least 12 drink servings');
+  await expect(toast).toContainText('14:00');
+  await page.getByRole('button', { name: 'Dismiss validation notification' }).click();
+  await page.getByRole('group', { name: 'Pizza item 1' }).getByRole('button', { name: 'Remove' }).click();
+  await page.getByRole('group', { name: /Lemonade jug item/ }).getByRole('button', { name: 'Remove' }).click();
+  await activity.getByLabel('Start time').fill('14:00');
+  await page.getByRole('button', { name: 'Add Sandwich platter', exact: true }).click();
+  await page.getByRole('group', { name: 'Sandwich platter item 2' }).getByLabel('Quantity').fill('2');
+  await page.getByRole('button', { name: 'Add Water pack', exact: true }).click();
+  await page.getByRole('button', { name: 'Complete task' }).click();
+  await expect(page.getByRole('heading', { name: 'Task submitted successfully' })).toBeVisible();
+  await expect(toast).toHaveCount(0);
+  await expect(page.getByText('Optional improvements')).toBeVisible();
 });
 
 test('participant adds, updates, moves and removes catalog items and reload keeps the edited plan', async ({ page }) => {

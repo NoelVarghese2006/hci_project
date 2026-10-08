@@ -22,7 +22,8 @@ Decorations are an optional improvement. Weekend and schedule workspaces cannot
 currently pass because their tools and validators remain unimplemented.
 
 The shared lifecycle records every submission and validation result. Failed
-submissions retain active timing and editing; successful submissions freeze the
+submissions show blocking requirements in a dismissible toast and in the workspace,
+and retain active timing and editing. Successful submissions freeze the
 final plan, validation, elapsed milliseconds and successful completion time
 exactly once. Trial outcomes distinguish successful completion from exceptional
 unsuccessful supervisor termination with a required reason and elapsed duration.
