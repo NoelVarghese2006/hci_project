@@ -35,7 +35,8 @@ pass. Feasible backtracking is optional, never a hidden passing requirement.
 The explicit weekend scenario is included in scenario version2.
 
 The shared lifecycle records every submission and validation result. Failed
-submissions retain active timing and editing; successful submissions freeze the
+submissions show blocking requirements in a dismissible toast and in the workspace,
+and retain active timing and editing. Successful submissions freeze the
 final plan, validation, elapsed milliseconds and successful completion time
 exactly once. Trial outcomes distinguish successful completion from exceptional
 unsuccessful supervisor termination with a required reason and elapsed duration.
@@ -61,6 +62,9 @@ timing, event records and reserved survey fields. The public `createSession`,
 definitions provide versioned initial state, runtime state guards, validators
 and future assistant evaluators. Incompatible or damaged data must be preserved instead
 of silently reassigned. Save failures retain in-memory data and a failure record.
+External storage edits and deletions trigger recovery instead of being overwritten
+by the current tab. Supervisor storage tools allow an explicit reload for QA;
+deleting the saved record and reloading returns to setup.
 
 Scenario, sequence and condition-policy identifiers are versioned pilot drafts.
 Baseline's disabled threshold is serialized explicitly as `null` alongside

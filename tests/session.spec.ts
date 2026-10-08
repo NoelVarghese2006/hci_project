@@ -1,5 +1,57 @@
 import { expect, test } from '@playwright/test';
 
+test('clearing storage is not undone by the current tab on a visibility change', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Participant ID').fill('QA19');
+  await page.getByLabel('Supervisor access code').fill('research-only');
+  await page.getByRole('button', { name: 'Create session' }).click();
+  await page.evaluate(() => {
+    localStorage.removeItem('planning-pilot-session-v1');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.getByRole('heading', { name: 'Assign a pilot session' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('planning-pilot-session-v1'))).toBeNull();
+});
+
+test('edited JSON survives visibility changes and clearing it unblocks recovery', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Participant ID').fill('QA19');
+  await page.getByLabel('Supervisor access code').fill('research-only');
+  await page.getByRole('button', { name: 'Create session' }).click();
+  await page.evaluate(() => {
+    localStorage.setItem('planning-pilot-session-v1', '{invalid JSON');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.getByRole('alert')).toContainText('Stored data could not be recovered');
+  await expect(page.getByRole('button', { name: 'Create session' })).toBeDisabled();
+  expect(await page.evaluate(() => localStorage.getItem('planning-pilot-session-v1'))).toBe('{invalid JSON');
+  await page.evaluate(() => localStorage.removeItem('planning-pilot-session-v1'));
+  await page.getByRole('button', { name: 'Reload saved session' }).click();
+  await expect(page.getByRole('button', { name: 'Create session' })).toBeEnabled();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a participant action does not overwrite an externally edited session', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Participant ID').fill('QA19');
+  await page.getByLabel('Supervisor access code').fill('research-only');
+  await page.getByRole('button', { name: 'Create session' }).click();
+  await page.getByLabel('I consent to take part in this supervised pilot').check();
+  await page.evaluate(() => {
+    const key = 'planning-pilot-session-v1';
+    const saved = JSON.parse(localStorage.getItem(key)!);
+    saved.configuration.scenarioVersion = 'unsupported-scenarios-v0';
+    localStorage.setItem(key, JSON.stringify(saved));
+  });
+  await page.getByRole('button', { name: 'Continue to instructions' }).click();
+  await expect(page.getByRole('alert')).toContainText('Stored data could not be recovered');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planning-pilot-session-v1')!));
+  expect(saved.configuration.scenarioVersion).toBe('unsupported-scenarios-v0');
+  expect(saved.phase).toBe('welcome');
+});
+
 test('unsupported scenario versions block recovery and preserve the original saved data', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Participant ID').fill('P008');
