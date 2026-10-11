@@ -95,3 +95,4 @@ Baseline's disabled threshold is serialized explicitly as `null` alongside
 `proactive: false`. Study knobs and content must be frozen after piloting before
 recruitment. See `ARCHITECTURE.md` and GitHub issues #3 and #4 for the full
 contract and issues #4–#8 for the implemented slices.
+
