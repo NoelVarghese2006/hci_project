@@ -2,22 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import type { ExperimentSession } from '../../types/experiment';
 import { consentToSession, createSession, recoverSession, revealTask, submitTask, terminateTask, updateTaskState } from '../../experiment/session';
 import { PILOT_SCENARIOS } from '../../experiment/scenarios';
-import { loadSession, saveSession } from '../../experiment/persistence';
+import { loadSession, saveSession, SESSION_STORAGE_KEY } from '../../experiment/persistence';
 import { recordEvent } from '../../experiment/logger';
 import { ExperimentShell } from './ExperimentShell';
 import { TaskRenderer } from './TaskRenderer';
 import { getTask } from '../../tasks/registry';
 import { ValidationFeedback } from './ValidationFeedback';
+import { ValidationToast } from './ValidationToast';
 import { configureSupervisorAccess } from '../../experiment/supervisor';
 import { SupervisorControls } from './SupervisorControls';
 
 export function ExperimentController() {
   const [recovery] = useState(() => {
-    try { return { session: loadSession(), error: '' }; }
+    try { return { session: loadSession(), serialized: localStorage.getItem(SESSION_STORAGE_KEY), error: '' }; }
     catch { return { session: null, error: 'Stored data could not be recovered. Ask the supervisor to preserve local data before starting another session.' }; }
   });
   const [session, setSession] = useState<ExperimentSession | null>(recovery.session);
   const sessionRef = useRef(session);
+  const lastStoredSession = useRef(recovery.serialized);
   const recovered = useRef(false);
   const lastVisibility = useRef(document.visibilityState);
   const [participantId, setParticipantId] = useState('');
@@ -26,10 +28,27 @@ export function ExperimentController() {
   const [error, setError] = useState(recovery.error);
   const [supervisorCode, setSupervisorCode] = useState('');
   const creating = useRef(false);
+  const [validationToast, setValidationToast] = useState<{ attempt: number; errors: string[] } | null>(null);
+
+  function reloadIfStorageChanged() {
+    try {
+      if (lastStoredSession.current !== undefined
+        && localStorage.getItem(SESSION_STORAGE_KEY) !== lastStoredSession.current) {
+        window.location.reload();
+        return true;
+      }
+    } catch { /* Save failures are handled by commit without discarding in-memory data. */ }
+    return false;
+  }
 
   function commit(next: ExperimentSession) {
+    if (reloadIfStorageChanged()) return;
     let saved = next;
-    try { saved = saveSession(next); setError(''); }
+    try {
+      saved = saveSession(next);
+      lastStoredSession.current = JSON.stringify(saved);
+      setError('');
+    }
     catch {
       saved = recordEvent(next, 'persistence_failed', { operation: 'save' });
       setError('Local saving failed. Keep this tab open and inform the supervisor; the current session remains in memory.');
@@ -51,7 +70,11 @@ export function ExperimentController() {
       if (current) commit(recordEvent(current, 'visibility_changed', { visibility }));
     }
     document.addEventListener('visibilitychange', visibilityChanged);
-    return () => document.removeEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('focus', reloadIfStorageChanged);
+    return () => {
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('focus', reloadIfStorageChanged);
+    };
   }, [recovery]);
 
   if (!session) {
@@ -78,6 +101,7 @@ export function ExperimentController() {
           {error && <p role="alert">{error}</p>}
           <button type="submit" disabled={Boolean(recovery.error)}>Create session</button>
         </form>
+        <button type="button" onClick={() => window.location.reload()}>Reload saved session</button>
       </ExperimentShell>
     );
   }
@@ -85,10 +109,22 @@ export function ExperimentController() {
   const trial = session.trials[session.currentTrialIndex];
   const scenario = PILOT_SCENARIOS[trial.task];
   const definition = getTask(trial.task);
+
+  function completeTask() {
+    if (reloadIfStorageChanged()) return;
+    const next = submitTask(sessionRef.current!);
+    commit(next);
+    const attempts = next.trials[next.currentTrialIndex].submissionAttempts;
+    const validation = attempts?.at(-1)?.validation;
+    setValidationToast(validation && !validation.isComplete
+      ? { attempt: attempts!.length, errors: validation.errors }
+      : null);
+  }
+
   return (
     <ExperimentShell title={session.phase === 'task' ? scenario.title : 'Planning session'}
       trialIndex={trial.startedAt !== undefined ? session.currentTrialIndex : undefined} startedAt={trial.startedAt} completedAt={trial.completedAt}
-      completionControl={session.phase === 'task' && definition ? { onComplete: () => commit(submitTask(sessionRef.current!)) } : session.phase === 'post-task-survey' ? false : undefined}>
+      completionControl={session.phase === 'task' && definition ? { onComplete: completeTask } : session.phase === 'post-task-survey' ? false : undefined}>
       {error && <p role="alert">{error}</p>}
       {session.phase === 'welcome' && <>
         <h2>Welcome to the planning pilot</h2>
@@ -109,7 +145,9 @@ export function ExperimentController() {
       {session.phase === 'task' && <>
         <h2>Scenario and minimum requirements</h2>
         <p>{scenario.instructions}</p>
-        <ValidationFeedback result={trial.submissionAttempts?.at(-1)?.validation} />
+        <ValidationFeedback result={trial.submissionAttempts?.at(-1)?.validation} announceErrors={false} />
+        {validationToast && <ValidationToast key={validationToast.attempt} errors={validationToast.errors}
+          onDismiss={() => setValidationToast(null)} />}
         <TaskRenderer taskId={trial.task} state={trial.taskState} onChange={(state, action) => commit(updateTaskState(sessionRef.current!, state, action))} />
         {definition && <SupervisorControls session={session} onTerminate={(authorization, reason) => commit(terminateTask(sessionRef.current!, authorization, reason))} />}
       </>}
@@ -119,6 +157,11 @@ export function ExperimentController() {
         {trial.terminationReason && <p>Termination reason: {trial.terminationReason}</p>}
         <ValidationFeedback result={trial.finalValidation} />
       </>}
+      <details>
+        <summary>Supervisor storage tools</summary>
+        <p>For disposable QA sessions, edit or remove the saved session in browser storage, then reload it here. Preserve study data first. Reloading discards unsaved in-memory changes.</p>
+        <button type="button" onClick={() => window.location.reload()}>Reload saved session</button>
+      </details>
     </ExperimentShell>
   );
 }
