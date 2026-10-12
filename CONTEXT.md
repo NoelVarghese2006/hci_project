@@ -122,3 +122,13 @@ on failure/completion/revalidation and records exposure only when advice is
 shown. This slice creates no requests, display timestamps or exposure events;
 the panel remains neutral. Versioned configuration, selection integrity and
 display-history shape are checked on recovery.
+
+Session exports use `planning-pilot-export-v1`: a lossless session snapshot
+(excluding the supervisor verifier), original ordered events, explicit millisecond
+units, derived selection/display counts and distinct successful versus unsuccessful
+durations. The document includes scenario, catalog, travel matrix, schedule and
+survey snapshots. Future session fields such as generation records are retained
+without rebuilding them in the exporter. Downloads never clear local data and
+cannot confirm that a file was saved. Failure events flag compromised retention;
+`persistedAt` records the last successful save, independently of export time.
+Supervisor storage tools offer downloads throughout the participant flow.
