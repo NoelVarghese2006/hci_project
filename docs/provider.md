@@ -51,5 +51,9 @@ Only a validated current response updates display cooldowns (30 seconds globally
 again on a later meaningful edit. Reload retains shown history and explicit
 acknowledgement/dismissal without replay or a second display event. No response
 is interpreted as ignoring, and subsequent edits are not labeled causal corrections.
+Configuration, provider, timeout and invalid-output failures show a retained
+supervisor status with a sanitized explanation and incident count. The warning
+survives reload and survey navigation so failed generation remains visible when
+assessing the pilot; cancellation after ordinary edits is not classified as failure.
 
 Implementation follows the official OpenAI [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
