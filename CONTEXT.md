@@ -120,7 +120,10 @@ reservation without replay. Reservations are distinct from real provider
 requests and actual display history. Future generation owns reservation release
 on failure/completion/revalidation and records exposure only when advice is
 shown. Selected signals from all three tasks use a loopback server to request structured
-OpenAI advice. Baseline makes no generation requests. Model, prompt/schema,
+advice through a provider-neutral server adapter, defaulting to Google Gemini.
+Native Gemini, OpenAI Responses and configurable chat-completions-compatible
+services are supported; other protocols require a server adapter. Baseline makes
+no generation requests. Provider identity, model, prompt/schema,
 output limit and finite timeout are shared across active conditions and recorded
 with every request; condition is never sent to the provider. The provider key
 stays on the server. See `docs/provider.md` for startup and live smoke checks.
