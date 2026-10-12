@@ -119,7 +119,7 @@ reserves its signal until a meaningful edit resolves it; recovery retains that
 reservation without replay. Reservations are distinct from real provider
 requests and actual display history. Future generation owns reservation release
 on failure/completion/revalidation and records exposure only when advice is
-shown. Selected birthday signals now use a loopback server to request structured
+shown. Selected signals from all three tasks use a loopback server to request structured
 OpenAI advice. Baseline makes no generation requests. Model, prompt/schema,
 output limit and finite timeout are shared across active conditions and recorded
 with every request; condition is never sent to the provider. The provider key
@@ -146,3 +146,59 @@ without rebuilding them in the exporter. Downloads never clear local data and
 cannot confirm that a file was saved. Failure events flag compromised retention;
 `persistedAt` records the last successful save, independently of export time.
 Supervisor storage tools offer downloads throughout the participant flow.
+
+
+All-task signal configuration `pilot-4` / `planning-signals-v2` keeps the
+birthday rules above and adds condition-independent weekend and schedule
+signals. The evaluator never changes the validator or reads condition metadata.
+Generation context includes the current plan, fixed constraints and applicable
+catalog/travel/fixed-commitment data so advice can refer to fictional options.
+The shared endpoint, prompt, model settings, policy and presentation serve all
+three tasks; only selected signals request generation. Reveal and recovery do
+not evaluate or request advice. Session versions incompatible with this draft
+are preserved and rejected, rather than silently converted for a new pilot.
+
+Severity conventions: missing required selections score .85; missing day
+activity coverage scores .4 + .4 times the missing fraction; budget pressure
+above 80% through 100% scores .6 times the fraction through that band, while
+excess scores .8 + .2 times the excess/budget ratio, capped at 1. Blocking time,
+opening, travel, overlap and deadline problems score .9. Optional route,
+wellbeing and adjacent-block improvements score .45 (no passing requirement).
+These are comparable draft priorities, not validated measurements of difficulty.
+
+Weekend identities are `weekend:lodging`, `weekend:transport`,
+`weekend:coverage:<day>`, `weekend:budget`, `weekend:opening:<bookingId>`,
+`weekend:overlap:<sortedIdPair>`, `weekend:travel:<fromId>:<toId>` and
+`weekend:route:<day>`. Route anchors use arrival/lodging/departure IDs; travel
+checks include arrival, overnight check-in/checkout and station departure.
+Opening signals include trip bounds and listed same-day windows. Overlap checks
+cover every intersecting pair; metadata retains bookings or travel minutes.
+Returning to a location after visiting another location produces optional daily
+backtracking advice. Exact travel and opening boundaries produce no conflict.
+
+Schedule identities are `schedule:preparation`, `schedule:bounds:<blockId>`,
+`schedule:deadline:<blockId>`,
+`schedule:overlap:<sortedIdPair>`,
+`schedule:back-to-back:<fromId>:<toId>` and
+`schedule:optional:<meal|rest|exercise>`.
+Preparation severity is .4 + .45 times the missing fraction of 240 minutes.
+For assistance coverage, only valid, non-overlapping preparation minutes before
+Friday17:00 count. Friday preparation extending after the deadline also has a
+separate deadline signal. Missing optional kinds mean none anywhere in the week;
+they do not impose daily hidden requirements. Non-overlapping successive blocks
+with a gap below15 minutes score .45 times (15-gap)/15. Metadata preserves block
+identities, times, category and whether a category is optional. Scores clamp to
+[0,1]; tie ordering is independent of array order.
+
+After a failed submission, an edit that removes a live blocking requirement
+records `participant_correction`, the exact removed requirement text and state
+revisions. Its `interventionId` is null and attribution is unspecified: temporal
+association does not establish advice causation. Independently, resolved stable
+signals record `signal_resolved` with prior exposure IDs as association only.
+Ordinary edits that add errors or resolve none do not claim a correction.
+These records use the same session/participant/trial/task/condition context and
+unique append-only IDs/sequences as other task events.
+
+See `docs/pilot-rehearsal.md` for automated observations and the supervised
+manual checklist. Live provider behavior, keyboard usability and participant
+understandability remain human pilot checks before researcher review and freeze.
