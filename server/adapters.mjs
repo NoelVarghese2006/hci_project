@@ -14,7 +14,7 @@ const gemini = {
       body: {
         systemInstruction: { parts: [{ text: prompt }] },
         contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
-        generationConfig: { maxOutputTokens: config.settings.maxOutputTokens, responseFormat: { text: { mimeType: 'application/json', schema } } },
+        generationConfig: { maxOutputTokens: config.settings.maxOutputTokens, responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema } } },
       },
     };
   },

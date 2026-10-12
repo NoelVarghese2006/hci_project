@@ -41,8 +41,10 @@ test('Gemini is the default and native structured advice uses server-only creden
     assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent');
     assert.equal(options.headers['x-goog-api-key'], 'gemini-secret');
     const body = JSON.parse(options.body);
-    assert.equal(body.generationConfig.responseFormat.text.mimeType, 'application/json');
+    assert.equal(body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
     assert.equal(body.generationConfig.responseFormat.text.schema.additionalProperties, false);
+    assert.equal(body.generationConfig.responseFormat.text.schema.properties.target.type, 'null');
+    assert.deepEqual(body.generationConfig.responseFormat.text.schema.properties.signalId.enum, ['food']);
     assert.equal(JSON.parse(body.contents[0].parts[0].text).sessionId, undefined);
     return Response.json({ responseId: 'gemini-response', modelVersion: 'gemini-2.5-flash-lite-001', candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ signalId: 'food', type: 'suggestion', message: 'Choose enough food for twelve guests.', target: null }) }] } }] });
   } }, async ({ url, post }) => {
@@ -96,6 +98,14 @@ for (const [provider, truncated, refused, invalid] of [
 }
 test('timeout aborts upstream and returns explicit failure', async () => fixture({ apiKey: 'test', timeoutMs: 100, fetchImpl: (_url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true })) }, async ({ post }) => {
   assert.equal((await post()).status, 504);
+}));
+
+test('default timeout allows delayed Gemini responses within its configured budget', async () => fixture({ apiKey: 'test', fetchImpl: async (_url, { signal }) => {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(signal.aborted, false);
+  return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ signalId: 'food', type: 'suggestion', message: 'Add food for twelve guests.', target: null }) }] } }] });
+} }, async ({ post }) => {
+  assert.equal((await post()).status, 200);
 }));
 test('concurrency guard rejects a third live call and releases slots on timeout', async () => {
   let started = 0;

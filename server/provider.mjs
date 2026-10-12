@@ -63,11 +63,15 @@ export function createProviderServer({ env = process.env, provider = env.LLM_PRO
     active++; requests++;
     const abort = new AbortController();
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; abort.abort(); }, timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; abort.abort(); }, config.timeoutMs);
     const cancel = () => { if (!res.writableEnded) abort.abort(); };
     res.on('close', cancel);
     try {
-      const call = adapter.build({ config, baseUrl, apiKey, prompt, schema, input: { signal: input.signal, context: input.context } });
+      const selectedSchema = { ...schema, properties: { ...schema.properties,
+        signalId: { type: 'string', enum: [input.signal.id] },
+        target: typeof input.signal.target === 'string' ? { type: 'string', enum: [input.signal.target] } : { type: 'null' },
+      } };
+      const call = adapter.build({ config, baseUrl, apiKey, prompt, schema: selectedSchema, input: { signal: input.signal, context: input.context } });
       const upstream = await fetchImpl(call.url, { method: 'POST', headers: { ...call.headers, 'Content-Type': 'application/json' }, signal: abort.signal, redirect: 'error', body: JSON.stringify(call.body) });
       if (!upstream.ok) return send(502, { error: 'provider-error' });
       const body = await upstream.json();
