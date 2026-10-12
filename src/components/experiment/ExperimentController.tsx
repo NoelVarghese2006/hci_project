@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ExperimentSession } from '../../types/experiment';
 import { consentToSession, createSession, recoverSession, revealTask, submitTask, terminateTask, updateTaskState } from '../../experiment/session';
 import { PILOT_SCENARIOS } from '../../experiment/scenarios';
+import { downloadSession } from '../../experiment/export';
 import { loadSession, saveSession, SESSION_STORAGE_KEY } from '../../experiment/persistence';
 import { recordEvent } from '../../experiment/logger';
 import { ExperimentShell } from './ExperimentShell';
@@ -28,6 +29,7 @@ export function ExperimentController() {
   const sessionRef = useRef(session);
   const lastStoredSession = useRef(recovery.serialized);
   const recovered = useRef(false);
+  const storageReadFailed = useRef(false);
   const lastVisibility = useRef(document.visibilityState);
   const [participantId, setParticipantId] = useState('');
   const [sequenceIndex, setSequenceIndex] = useState('1');
@@ -46,7 +48,10 @@ export function ExperimentController() {
         window.location.reload();
         return true;
       }
-    } catch { /* Save failures are handled by commit without discarding in-memory data. */ }
+    } catch {
+      storageReadFailed.current = true;
+      setError('Local storage could not be read. Keep this tab open and export the available records.');
+    }
     return false;
   }
 
@@ -59,6 +64,10 @@ export function ExperimentController() {
       pending.controller.abort();
       pendingRequest.current = null;
       next = finishGeneration(next, pending.id, 'canceled', undefined, 'task-changed');
+    }
+    if (storageReadFailed.current) {
+      next = recordEvent(next, 'persistence_failed', { operation: 'read' });
+      storageReadFailed.current = false;
     }
     let saved = next;
     try {
@@ -252,7 +261,7 @@ export function ExperimentController() {
       </>}
       {session.phase === 'post-task-survey' && <>
         <h2>{trial.outcome === 'successful' ? 'Task submitted successfully' : 'Trial ended by supervisor'}</h2>
-        <p>Your final plan and outcome have been saved. Answer both questions to continue.</p>
+        <p>Your final plan and outcome are recorded. Answer both questions to continue.</p>
         {trial.terminationReason && <p>Termination reason: {trial.terminationReason}</p>}
         <ValidationFeedback result={trial.finalValidation} />
         <PostTaskSurveyForm draft={session.postTaskSurveyDrafts[trial.id] ?? {}} allowNotApplicable={!assistanceWasDisplayed(session, trial.id)}
@@ -260,9 +269,21 @@ export function ExperimentController() {
       </>}
       {session.phase === 'final-survey' && <FinalSurveyForm draft={session.finalSurveyDraft} trials={session.trials}
         onChange={(draft) => commit(setFinalSurveyDraft(sessionRef.current!, draft))} onSubmit={() => commit(submitFinalSurvey(sessionRef.current!))} />}
-      {session.phase === 'complete' && <><h2>Session complete</h2><p>Thank you. Your session records are saved in this browser. Tell the supervisor you have finished.</p></>}
+      {session.phase === 'complete' && <><h2>Session complete</h2><p>Thank you. Tell the supervisor you have finished so they can export the session records.</p></>}
       <details>
         <summary>Supervisor storage tools</summary>
+        <button type="button" onClick={() => {
+          let available = sessionRef.current!;
+          if (storageReadFailed.current) {
+            available = recordEvent(available, 'persistence_failed', { operation: 'read' });
+            storageReadFailed.current = false;
+            sessionRef.current = available;
+            setSession(available);
+          }
+          downloadSession(available);
+        }}>Download session JSON</button>
+        <p>Download complete or incomplete records without clearing local data. Check that the file was saved before closing this tab.</p>
+        {session.events.some((event) => event.eventType === 'persistence_failed') && <p>Retention is compromised: local storage failed during this session. Export the available in-memory records now.</p>}
         <p>For disposable QA sessions, edit or remove the saved session in browser storage, then reload it here. Preserve study data first. Reloading discards unsaved in-memory changes.</p>
         <button type="button" onClick={() => window.location.reload()}>Reload saved session</button>
       </details>
