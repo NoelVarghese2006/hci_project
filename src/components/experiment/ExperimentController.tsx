@@ -19,6 +19,7 @@ import { abandonSelection, beginGeneration, finishGeneration, respondToIntervent
 import { validGenerationConfiguration } from '../../agent/generation';
 import type { GenerationConfiguration } from '../../agent/generation';
 import type { TaskAction } from '../../types/task';
+import { GenerationStatus } from './GenerationStatus';
 
 export function ExperimentController() {
   const [recovery] = useState(() => {
@@ -270,6 +271,7 @@ export function ExperimentController() {
       {session.phase === 'final-survey' && <FinalSurveyForm draft={session.finalSurveyDraft} trials={session.trials}
         onChange={(draft) => commit(setFinalSurveyDraft(sessionRef.current!, draft))} onSubmit={() => commit(submitFinalSurvey(sessionRef.current!))} />}
       {session.phase === 'complete' && <><h2>Session complete</h2><p>Thank you. Tell the supervisor you have finished so they can export the session records.</p></>}
+      <GenerationStatus events={session.events} />
       <details>
         <summary>Supervisor storage tools</summary>
         <button type="button" onClick={() => {

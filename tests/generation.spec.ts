@@ -46,10 +46,25 @@ for (const failure of ['invalid', 'provider', 'transport'] as const) {
     await expect.poll(async () => (await records(page)).trials[0].agentHistory.requests[0].status).toBe(failure === 'invalid' ? 'invalid' : 'failed');
     expect((await records(page)).events.filter((event: { eventType: string }) => event.eventType === 'agent_intervention_shown')).toHaveLength(0);
     await expect(page.getByText('No suggestions right now.')).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Supervisor generation status' })).toContainText('Assistant generation');
+    await expect(page.getByRole('status', { name: 'Supervisor generation status' })).toContainText('Editing and submission remain available');
     await page.getByRole('button', { name: 'Complete task' }).click();
     await expect(page.getByRole('alert')).toContainText('requirements');
   });
 }
+
+test('unavailable provider configuration shows a retained supervisor warning without exposing raw errors', async ({ page }) => {
+  await page.route('**/api/interventions/config', (route) => route.fulfill({ status: 503, json: { error: 'private-upstream-detail' } }));
+  await seed(page);
+  await page.getByRole('button', { name: 'Add Sandwich platter' }).click();
+  const warning = page.getByRole('status', { name: 'Supervisor generation status' });
+  await expect(warning).toContainText('Assistant configuration could not be loaded');
+  await expect(page.getByText('private-upstream-detail')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Complete task' })).toBeEnabled();
+  await page.reload();
+  await expect(warning).toContainText('Assistant configuration could not be loaded');
+  expect((await records(page)).events.filter((event: { eventType: string }) => event.eventType === 'agent_intervention_shown')).toHaveLength(0);
+});
 
 test('delayed advice is canceled by a relevant edit and cannot display its late response', async ({ page }) => {
   let release!: () => void;
@@ -83,6 +98,7 @@ test('finite timeout and reload interrupt generation without replay', async ({ p
   await expect.poll(async () => calls).toBe(1);
   await page.clock.fastForward(1001);
   await expect.poll(async () => (await records(page)).trials[0].agentHistory.requests[0].status).toBe('timeout');
+  await expect(page.getByRole('status', { name: 'Supervisor generation status' })).toContainText('Assistant generation timed out');
   await page.getByRole('button', { name: 'Add Water pack' }).click();
   await expect.poll(async () => calls).toBe(2);
   await page.reload();
