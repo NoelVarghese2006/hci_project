@@ -64,6 +64,11 @@ reload locks the controls again. A salted SHA-256 verifier is stored locally,
 not the plaintext code. This protects ordinary supervised controls; it is not
 remote authentication or a defense against someone modifying browser data.
 
+For testing, open **Supervisor tools > Supervisor access**, unlock the controls,
+and choose **Skip task (testing)**. This ends the current task with the reason
+"Skipped for testing." and opens its post-task survey. It records an unsuccessful
+trial, not a successful completion; answer the survey to reveal the next task.
+
 Assignment, phase, timing anchors, configuration and ordered event records are
 stored under `planning-pilot-session-v1` in browser local storage after each
 committed action. Reload resumes that same session. Consent checkboxes remain

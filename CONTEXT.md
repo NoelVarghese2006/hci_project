@@ -94,6 +94,10 @@ an in-memory authorization for exceptional termination of that session. Codes
 are stored as salted verifiers; authorization is not persisted and reload
 relocks controls. A fixed bottom-left supervisor icon opens a side drawer with
 access and storage tools, keeping them outside the participant workspace.
+Unlocked controls include a testing skip button. It terminates the active task
+with the fixed reason "Skipped for testing." and opens the required post-task
+survey. Skipped tasks retain an unsuccessful outcome and elapsed duration,
+without a successful completion time; surveys and assignment order remain intact.
 A drawer toggle shows read-only testing scores on the main page: current issue severity,
 recency bonus, final score, condition threshold and engine eligibility/exclusions.
 Opening or refreshing the inspector never logs events, reserves signals, requests
